@@ -36,6 +36,8 @@ __MACOSX/
 *.zip
 *.DS_Store
 *.tgz
+zips/
+bin/*
 
 # TBB Binary
 oneapi-tbb*
