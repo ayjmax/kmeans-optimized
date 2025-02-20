@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# Misc.
+__MACOSX/
+*.zip
+*.DS_Store
