@@ -8,6 +8,7 @@
 #include <time.h>
 #include <algorithm>
 #include <chrono>
+#include <sstream> // Include the sstream header for stringstream
 
 using namespace std;
 
@@ -76,6 +77,7 @@ private:
 	vector<Point> points;
 
 public:
+	// Constructor to initialize with a random existing point
 	Cluster(int id_cluster, Point point)
 	{
 		this->id_cluster = id_cluster;
@@ -86,6 +88,13 @@ public:
 			central_values.push_back(point.getValue(i));
 
 		points.push_back(point);
+	}
+
+	// New constructor to initialize with predefined central values
+	Cluster (int id_cluster, vector<double>& central_values)
+	{
+		this->id_cluster = id_cluster;
+		this->central_values = central_values;
 	}
 
 	void addPoint(Point point)
@@ -152,8 +161,10 @@ private:
 			sum += pow(clusters[0].getCentralValue(i) -
 					   point.getValue(i), 2.0);
 		}
-
+		
+		// Sqrt potentially not necessary?
 		min_dist = sqrt(sum);
+		// min_dist = sum;
 
 		for(int i = 1; i < K; i++)
 		{
@@ -194,26 +205,23 @@ public:
 		if(K > total_points)
 			return;
 
-		vector<int> prohibited_indexes;
+		// Manually initialize K cluster centroids with predefined values
+		vector<vector<double>> initial_centroids = {
+			{38609.2, 728.876, 264.767, 186.818, 1.42818, 0.689093, 39038, 221.602, 0.758159, 0.989029, 0.914007, 0.840847, 0.00686726, 0.00213791, 0.710003, 0.996999},
+			{174059, 1588.67, 594.556, 374.795, 1.58763, 0.771401, 176399, 469.773, 0.776568, 0.986869, 0.864111, 0.792037, 0.00343789, 0.000840289, 0.628237, 0.991797},
+			{47345.5, 829.504, 315.348, 193.204, 1.65068, 0.771733, 47935.3, 245.42, 0.740671, 0.987739, 0.867341, 0.784174, 0.00665986, 0.00157933, 0.619003, 0.995124},
+			{71557, 1046.36, 392.086, 234.568, 1.67982, 0.795097, 72716.1, 301.742, 0.751715, 0.984066, 0.822499, 0.771608, 0.00548663, 0.00120628, 0.596954, 0.992484},
+			{85686, 1141.11, 429.742, 255.997, 1.68471, 0.798436, 87043.1, 330.051, 0.755788, 0.984409, 0.827205, 0.769505, 0.00503001, 0.00109253, 0.593336, 0.99205},
+			{58464.4, 953.494, 371.873, 202.469, 1.85603, 0.829191, 59350.5, 272.711, 0.723485, 0.985113, 0.809081, 0.736804, 0.00637706, 0.00117043, 0.545769, 0.992736},
+			{29664.5, 639.033, 234.918, 161.141, 1.46392, 0.7195, 30023.8, 194.083, 0.755489, 0.987979, 0.911338, 0.82758, 0.00796609, 0.00231207, 0.686245, 0.996982}
+		};
 
-		// choose K distinct values for the centers of the clusters
-		for(int i = 0; i < K; i++)
-		{
-			while(true)
-			{
-				int index_point = rand() % total_points;
-
-				if(find(prohibited_indexes.begin(), prohibited_indexes.end(),
-						index_point) == prohibited_indexes.end())
-				{
-					prohibited_indexes.push_back(index_point);
-					points[index_point].setCluster(i);
-					Cluster cluster(i, points[index_point]);
-					clusters.push_back(cluster);
-					break;
-				}
-			}
+		// Assign initial centroids manually instead of randomly selecting points
+		for (int i = 0; i < K; i++) {
+			Cluster cluster(i, initial_centroids[i]);
+			clusters.push_back(cluster);
 		}
+
         auto end_phase1 = chrono::high_resolution_clock::now();
 
 		int iter = 1;
@@ -271,33 +279,32 @@ public:
 		{
 			int total_points_cluster =  clusters[i].getTotalPoints();
 
-			cout << "Cluster " << clusters[i].getID() + 1 << endl;
+			cout << "############################################################# Cluster " << clusters[i].getID() + 1 << " ";
+			cout << "#############################################################" << endl;
 			for(int j = 0; j < total_points_cluster; j++)
 			{
-				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << ": ";
-				for(int p = 0; p < total_values; p++)
-					cout << clusters[i].getPoint(j).getValue(p) << " ";
-
-				string point_name = clusters[i].getPoint(j).getName();
-
-				if(point_name != "")
-					cout << "- " << point_name;
-
-				cout << endl;
+				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << "-> " << clusters[i].getPoint(j).getName() << endl;
+				// for(int p = 0; p < total_values; p++)
+				// 	cout << clusters[i].getPoint(j).getValue(p) << " ";
+				// string point_name = clusters[i].getPoint(j).getName();
+				// if(point_name != "")
+				// 	cout << "- " << point_name;
 			}
 
 			cout << "Cluster values: ";
 
 			for(int j = 0; j < total_values; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
-
-			cout << "\n\n";
-            cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"\n";
-
-            cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"\n";
-
-            cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"\n";
+			
+			cout << "\n\n\n" << endl;
 		}
+
+		cout << "\n\n";
+		cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"μs\n";
+
+		cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
+
+		cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"μs\n";
 	}
 };
 
@@ -305,9 +312,33 @@ int main(int argc, char *argv[])
 {
 	srand (time(NULL));
 
-	int total_points, total_values, K, max_iterations, has_name;
+	string first_line;
+	getline(cin, first_line);
 
-	cin >> total_points >> total_values >> K >> max_iterations >> has_name;
+	// IMPORTANT: Remove BOM if it exists
+	if (first_line.size() > 0 && first_line[0] == '\xEF' && first_line[1] == '\xBB' && first_line[2] == '\xBF') {
+		first_line.erase(0, 3);
+	}
+
+	cout << "first_line = " << first_line << endl;
+
+	// Use stringstream to split the first line into integers
+	stringstream ss(first_line);
+	int total_points, total_values, K, max_iterations, has_name;
+	ss >> total_points >> total_values >> K >> max_iterations >> has_name;
+
+	// Print all the inputed values
+	cout << "total_points = " << total_points << endl;
+	cout << "total_values = " << total_values << endl;
+	cout << "K = " << K << endl;
+	cout << "max_iterations = " << max_iterations << endl;
+	cout << "has_name = " << has_name << endl;
+
+	if (total_points == 0 || total_values == 0 || K == 0 || max_iterations == 0)
+	{
+		cout << "Invalid input" << endl;
+		return 1;
+	}
 
 	vector<Point> points;
 	string point_name;
