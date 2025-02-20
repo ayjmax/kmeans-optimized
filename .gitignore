@@ -39,6 +39,7 @@ __MACOSX/
 zips/
 bin/*
 archive/
+.vscode/
 
 # TBB Binary
 oneapi-tbb*
