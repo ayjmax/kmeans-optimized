@@ -39,3 +39,6 @@ __MACOSX/
 
 # TBB Binary
 oneapi-tbb*
+
+# Dataset
+DryBeanDataset/
