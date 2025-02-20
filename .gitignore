@@ -38,6 +38,7 @@ __MACOSX/
 *.tgz
 zips/
 bin/*
+archive/
 
 # TBB Binary
 oneapi-tbb*
