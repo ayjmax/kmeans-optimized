@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <chrono>
 #include <sstream> // Include the sstream header for stringstream
+#include <climits>
+#include <numeric>
 
 using namespace std;
 
@@ -17,16 +19,16 @@ class Point
 private:
 	int id_point, id_cluster;
 	vector<double> values;
-	int total_values;
+	int total_attr;
 	string name;
 
 public:
 	Point(int id_point, vector<double>& values, string name = "")
 	{
 		this->id_point = id_point;
-		total_values = values.size();
+		total_attr = values.size();
 
-		for(int i = 0; i < total_values; i++)
+		for(int i = 0; i < total_attr; i++)
 			this->values.push_back(values[i]);
 
 		this->name = name;
@@ -55,7 +57,7 @@ public:
 
 	int getTotalValues()
 	{
-		return total_values;
+		return total_attr;
 	}
 
 	void addValue(double value)
@@ -82,9 +84,9 @@ public:
 	{
 		this->id_cluster = id_cluster;
 
-		int total_values = point.getTotalValues();
+		int total_attr = point.getTotalValues();
 
-		for(int i = 0; i < total_values; i++)
+		for(int i = 0; i < total_attr; i++)
 			central_values.push_back(point.getValue(i));
 
 		points.push_back(point);
@@ -147,7 +149,7 @@ class KMeans
 {
 private:
 	int K; // number of clusters
-	int total_values, total_points, max_iterations;
+	int total_attr, total_points, max_iterations;
 	vector<Cluster> clusters;
 
 	// return ID of nearest center (uses euclidean distance)
@@ -155,33 +157,30 @@ private:
 	{
 		double sum = 0.0, min_dist;
 		int id_cluster_center = 0;
+		vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
 
-		for(int i = 0; i < total_values; i++)
+		for(int i = 0; i < total_attr; i++)
 		{
 			sum += pow(clusters[0].getCentralValue(i) -
 					   point.getValue(i), 2.0);
 		}
-		
-		// Sqrt potentially not necessary?
-		min_dist = sqrt(sum);
-		// min_dist = sum;
+
+		// min_dist = sqrt(sum); // 1. Sqrt potentially not necessary?
+		min_dist = sum;
 
 		for(int i = 1; i < K; i++)
 		{
-			double dist;
-			sum = 0.0;
-
-			for(int j = 0; j < total_values; j++)
+			for(int j = 0; j < total_attr; j++)
 			{
-				sum += pow(clusters[i].getCentralValue(j) -
-						   point.getValue(j), 2.0);
+				euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
 			}
 
-			dist = sqrt(sum);
+			// dist = sqrt(sum); // 1. Sqrt potentially not necessary?
+			sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
 
-			if(dist < min_dist)
+			if(sum < min_dist)
 			{
-				min_dist = dist;
+				min_dist = sum;
 				id_cluster_center = i;
 			}
 		}
@@ -190,11 +189,11 @@ private:
 	}
 
 public:
-	KMeans(int K, int total_points, int total_values, int max_iterations)
+	KMeans(int K, int total_points, int total_attr, int max_iterations)
 	{
 		this->K = K;
 		this->total_points = total_points;
-		this->total_values = total_values;
+		this->total_attr = total_attr;
 		this->max_iterations = max_iterations;
 	}
 
@@ -207,13 +206,13 @@ public:
 
 		// Manually initialize K cluster centroids with predefined values
 		vector<vector<double>> initial_centroids = {
-			{38609.2, 728.876, 264.767, 186.818, 1.42818, 0.689093, 39038, 221.602, 0.758159, 0.989029, 0.914007, 0.840847, 0.00686726, 0.00213791, 0.710003, 0.996999},
-			{174059, 1588.67, 594.556, 374.795, 1.58763, 0.771401, 176399, 469.773, 0.776568, 0.986869, 0.864111, 0.792037, 0.00343789, 0.000840289, 0.628237, 0.991797},
-			{47345.5, 829.504, 315.348, 193.204, 1.65068, 0.771733, 47935.3, 245.42, 0.740671, 0.987739, 0.867341, 0.784174, 0.00665986, 0.00157933, 0.619003, 0.995124},
-			{71557, 1046.36, 392.086, 234.568, 1.67982, 0.795097, 72716.1, 301.742, 0.751715, 0.984066, 0.822499, 0.771608, 0.00548663, 0.00120628, 0.596954, 0.992484},
-			{85686, 1141.11, 429.742, 255.997, 1.68471, 0.798436, 87043.1, 330.051, 0.755788, 0.984409, 0.827205, 0.769505, 0.00503001, 0.00109253, 0.593336, 0.99205},
-			{58464.4, 953.494, 371.873, 202.469, 1.85603, 0.829191, 59350.5, 272.711, 0.723485, 0.985113, 0.809081, 0.736804, 0.00637706, 0.00117043, 0.545769, 0.992736},
-			{29664.5, 639.033, 234.918, 161.141, 1.46392, 0.7195, 30023.8, 194.083, 0.755489, 0.987979, 0.911338, 0.82758, 0.00796609, 0.00231207, 0.686245, 0.996982}
+			{43266, 772.889, 287.013, 193.007, 1.48706, 0.740125, 43691, 234.708, 0.77649, 0.990273, 0.91017, 0.817763, 0.00663368, 0.00182997, 0.668736, 0.994449},
+			{77590, 1074.37, 409.117, 245.292, 1.66788, 0.800326, 79050, 314.31, 0.798884, 0.981531, 0.844714, 0.768264, 0.0052728, 0.00113309, 0.59023, 0.984431},
+			{75720, 1097.63, 390.076, 248.122, 1.57211, 0.771617, 77033, 310.499, 0.703848, 0.982955, 0.789781, 0.795997, 0.00515155, 0.00127575, 0.633612, 0.996108},
+			{37064, 710.701, 265.11, 178.209, 1.48763, 0.740362, 37390, 217.236, 0.706142, 0.991281, 0.922122, 0.819417, 0.00715277, 0.00198918, 0.671444, 0.998863},
+			{71882, 1040.31, 408.824, 226.343, 1.80621, 0.832753, 73208, 302.528, 0.723516, 0.981887, 0.834644, 0.739996, 0.00568743, 0.00105199, 0.547594, 0.989071},
+			{52187, 975.927, 311.194, 215.771, 1.44224, 0.720587, 53664, 257.772, 0.709043, 0.972477, 0.688553, 0.828333, 0.00596305, 0.00173169, 0.686136, 0.989575},
+			{80724, 1071.17, 416.301, 247.545, 1.68172, 0.804, 81330, 320.595, 0.799723, 0.992549, 0.884088, 0.770103, 0.00515709, 0.00111887, 0.593058, 0.997358}
 		};
 
 		// Assign initial centroids manually instead of randomly selecting points
@@ -222,11 +221,13 @@ public:
 			clusters.push_back(cluster);
 		}
 
+
         auto end_phase1 = chrono::high_resolution_clock::now();
 
 		int iter = 1;
 
-		while(true)
+		// 4. Turn while(true) into a for loop (still w/ break statement for stopping condition)
+		for (int iter = 1; iter <= max_iterations; iter++)
 		{
 			bool done = true;
 
@@ -250,28 +251,26 @@ public:
 			// recalculating the center of each cluster
 			for(int i = 0; i < K; i++)
 			{
-				for(int j = 0; j < total_values; j++)
+				for(int j = 0; j < total_attr; j++) // loop through all attributes/fields
 				{
-					int total_points_cluster = clusters[i].getTotalPoints();
+					int cluster_num_points = clusters[i].getTotalPoints();
 					double sum = 0.0;
 
-					if(total_points_cluster > 0)
+					if(cluster_num_points > 0)
 					{
-						for(int p = 0; p < total_points_cluster; p++)
+						for(int p = 0; p < cluster_num_points; p++)
 							sum += clusters[i].getPoint(p).getValue(j);
-						clusters[i].setCentralValue(j, sum / total_points_cluster);
+						clusters[i].setCentralValue(j, sum / cluster_num_points);
 					}
 				}
 			}
 
-			if(done == true || iter >= max_iterations)
+			if(done == true) // Keep break condition
 			{
-				cout << "Break in iteration " << iter << "\n\n";
 				break;
 			}
-
-			iter++;
 		}
+		cout << "Break in iteration " << iter << "\n\n";
         auto end = chrono::high_resolution_clock::now();
 
 		// shows elements of clusters
@@ -284,7 +283,7 @@ public:
 			for(int j = 0; j < total_points_cluster; j++)
 			{
 				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << "-> " << clusters[i].getPoint(j).getName() << endl;
-				// for(int p = 0; p < total_values; p++)
+				// for(int p = 0; p < total_attr; p++)
 				// 	cout << clusters[i].getPoint(j).getValue(p) << " ";
 				// string point_name = clusters[i].getPoint(j).getName();
 				// if(point_name != "")
@@ -293,7 +292,7 @@ public:
 
 			cout << "Cluster values: ";
 
-			for(int j = 0; j < total_values; j++)
+			for(int j = 0; j < total_attr; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
 			
 			cout << "\n\n\n" << endl;
@@ -324,17 +323,17 @@ int main(int argc, char *argv[])
 
 	// Use stringstream to split the first line into integers
 	stringstream ss(first_line);
-	int total_points, total_values, K, max_iterations, has_name;
-	ss >> total_points >> total_values >> K >> max_iterations >> has_name;
+	int total_points, total_attr, K, max_iterations, has_name;
+	ss >> total_points >> total_attr >> K >> max_iterations >> has_name;
 
 	// Print all the inputed values
 	cout << "total_points = " << total_points << endl;
-	cout << "total_values = " << total_values << endl;
+	cout << "total_attr = " << total_attr << endl;
 	cout << "K = " << K << endl;
 	cout << "max_iterations = " << max_iterations << endl;
 	cout << "has_name = " << has_name << endl;
 
-	if (total_points == 0 || total_values == 0 || K == 0 || max_iterations == 0)
+	if (total_points == 0 || total_attr == 0 || K == 0 || max_iterations == 0)
 	{
 		cout << "Invalid input" << endl;
 		return 1;
@@ -347,7 +346,7 @@ int main(int argc, char *argv[])
 	{
 		vector<double> values;
 
-		for(int j = 0; j < total_values; j++)
+		for(int j = 0; j < total_attr; j++)
 		{
 			double value;
 			cin >> value;
@@ -367,7 +366,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	KMeans kmeans(K, total_points, total_values, max_iterations);
+	KMeans kmeans(K, total_points, total_attr, max_iterations);
 	kmeans.run(points);
 
 	return 0;
