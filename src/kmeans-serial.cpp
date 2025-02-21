@@ -77,6 +77,7 @@ private:
 	int id_cluster;
 	vector<double> central_values;
 	vector<Point> points;
+	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster
 
 public:
 	// Constructor to initialize with a random existing point
@@ -93,10 +94,11 @@ public:
 	}
 
 	// New constructor to initialize with predefined central values
-	Cluster (int id_cluster, vector<double>& central_values)
+	Cluster (int id_cluster, vector<double>& central_values, int total_attr)
 	{
 		this->id_cluster = id_cluster;
 		this->central_values = central_values;
+		attributeSums.assign(total_attr, 0.0); // 5. Add a vector to store the sum of all attributes of all points in the cluster
 	}
 
 	void addPoint(Point point)
@@ -142,6 +144,37 @@ public:
 	int getID()
 	{
 		return id_cluster;
+	}
+
+	vector<double>& getAttributeSums() // 5. Add a method to get the sum of all attributes of all points in the cluster
+	{
+		return attributeSums;
+	}
+
+	void updateCentralValues() // 5. Add a method to update the central values based on the sum of all attributes of all points in the cluster
+	{
+		int total_points = getTotalPoints();
+		int total_attr = attributeSums.size();
+		if (total_points > 0) {
+			for(int i = 0; i < total_attr; i++)
+			{
+				central_values[i] = attributeSums[i] / total_points;
+			}
+		}
+	}
+
+	void addAttributeSums(Point point) // 5. Add a method to add the attributes of the point to the sum of all attributes of all points in the cluster
+	{
+		for(int i = 0; i < point.getTotalValues(); i++)
+		{
+			attributeSums[i] += point.getValue(i);
+		}
+	}
+
+
+	void clearAttributeSums() // 5. Add a method to clear the sum of all attributes of all points in the cluster
+	{
+		fill(attributeSums.begin(), attributeSums.end(), 0.0); // replaces all values w/ 0.0
 	}
 };
 
@@ -217,19 +250,25 @@ public:
 
 		// Assign initial centroids manually instead of randomly selecting points
 		for (int i = 0; i < K; i++) {
-			Cluster cluster(i, initial_centroids[i]);
+			Cluster cluster(i, initial_centroids[i], total_attr);
 			clusters.push_back(cluster);
 		}
 
 
         auto end_phase1 = chrono::high_resolution_clock::now();
 
-		int iter = 1;
 
 		// 4. Turn while(true) into a for loop (still w/ break statement for stopping condition)
-		for (int iter = 1; iter <= max_iterations; iter++)
+		int iter = 1;
+		for (; iter <= max_iterations; iter++)
 		{
 			bool done = true;
+
+			// 5. Clear the sum of all attributes of all points in the cluster
+			for(int i = 0; i < K; i++)
+			{
+				clusters[i].clearAttributeSums();
+			}
 
 			// associates each point to the nearest center
 			for(int i = 0; i < total_points; i++)
@@ -246,21 +285,21 @@ public:
 					clusters[id_nearest_center].addPoint(points[i]);
 					done = false;
 				}
+
+				// 5. Add the attributes of the point to the sum of all attributes of all points in the cluster
+				clusters[id_nearest_center].addAttributeSums(points[i]);
 			}
 
 			// recalculating the center of each cluster
 			for(int i = 0; i < K; i++)
 			{
-				for(int j = 0; j < total_attr; j++) // loop through all attributes/fields
-				{
-					int cluster_num_points = clusters[i].getTotalPoints();
-					double sum = 0.0;
-
-					if(cluster_num_points > 0)
+				// 5. Calculate the new centroid based on attributeSums
+				int cluster_num_points = clusters[i].getTotalPoints();
+				if (cluster_num_points > 0) {
+					vector<double>& attributeSums = clusters[i].getAttributeSums();
+					for(int j = 0; j < total_attr; j++)
 					{
-						for(int p = 0; p < cluster_num_points; p++)
-							sum += clusters[i].getPoint(p).getValue(j);
-						clusters[i].setCentralValue(j, sum / cluster_num_points);
+						clusters[i].setCentralValue(j, attributeSums[j] / cluster_num_points);
 					}
 				}
 			}
