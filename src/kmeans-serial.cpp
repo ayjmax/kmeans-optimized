@@ -11,6 +11,7 @@
 #include <sstream> // Include the sstream header for stringstream
 #include <climits>
 #include <numeric>
+#include <map>
 
 using namespace std;
 
@@ -76,7 +77,7 @@ class Cluster
 private:
 	int id_cluster;
 	vector<double> central_values;
-	vector<Point> points;
+	map<int, Point> points; // 6. Make removing a Point O(1) operation
 	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster
 
 public:
@@ -90,7 +91,7 @@ public:
 		for(int i = 0; i < total_attr; i++)
 			central_values.push_back(point.getValue(i));
 
-		points.push_back(point);
+		points.insert(pair<int, Point>(point.getID(), point));
 	}
 
 	// New constructor to initialize with predefined central values
@@ -98,27 +99,19 @@ public:
 	{
 		this->id_cluster = id_cluster;
 		this->central_values = central_values;
-		attributeSums.assign(total_attr, 0.0); // 5. Add a vector to store the sum of all attributes of all points in the cluster
+		this->attributeSums.assign(total_attr, 0.0); // 5. Assign initial 16 values of 0.0 to attributeSums
 	}
 
 	void addPoint(Point point)
 	{
-		points.push_back(point);
+		points.insert(pair<int, Point>(point.getID(), point));
 	}
 
+	// 6. Remove a Point in O(1) time
 	bool removePoint(int id_point)
 	{
-		int total_points = points.size();
-
-		for(int i = 0; i < total_points; i++)
-		{
-			if(points[i].getID() == id_point)
-			{
-				points.erase(points.begin() + i);
-				return true;
-			}
-		}
-		return false;
+		points.erase(id_point); 
+		return true;
 	}
 
 	double getCentralValue(int index)
@@ -131,10 +124,18 @@ public:
 		central_values[index] = value;
 	}
 
-	Point getPoint(int index)
-	{
-		return points[index];
-	}
+    // 6. Method to get all points in the cluster
+    vector<Point> getAllPoints()
+    {
+        vector<Point> allPoints;
+        for (const auto& pair : points)
+        {
+			// std::cout << "pair.first = " << pair.first << std::endl;
+			// std::cout << "pair.second = " << &pair.second << std::endl;
+            allPoints.push_back(pair.second);
+        }
+        return allPoints;
+    }
 
 	int getTotalPoints()
 	{
@@ -146,24 +147,26 @@ public:
 		return id_cluster;
 	}
 
-	vector<double>& getAttributeSums() // 5. Add a method to get the sum of all attributes of all points in the cluster
+	// 5. Getter for attributeSums
+	vector<double>& getAttributeSums() 
 	{
 		return attributeSums;
 	}
 
-	void updateCentralValues() // 5. Add a method to update the central values based on the sum of all attributes of all points in the cluster
-	{
+	// 5. Update the central values based on attributeSums
+	void updateCentralValues() {
 		int total_points = getTotalPoints();
 		int total_attr = attributeSums.size();
-		if (total_points > 0) {
-			for(int i = 0; i < total_attr; i++)
+		if (total_points > 0) { // Safety check
+			for(int i = 0; i < total_attr; i++) // 16 attributes
 			{
 				central_values[i] = attributeSums[i] / total_points;
 			}
 		}
 	}
 
-	void addAttributeSums(Point point) // 5. Add a method to add the attributes of the point to the sum of all attributes of all points in the cluster
+	// 5. Add the attribute values of the point to attributeSums
+	void addAttributeSums(Point point)
 	{
 		for(int i = 0; i < point.getTotalValues(); i++)
 		{
@@ -171,10 +174,10 @@ public:
 		}
 	}
 
-
-	void clearAttributeSums() // 5. Add a method to clear the sum of all attributes of all points in the cluster
+	// 5. Clear attributeSums
+	void clearAttributeSums()
 	{
-		fill(attributeSums.begin(), attributeSums.end(), 0.0); // replaces all values w/ 0.0
+		fill(attributeSums.begin(), attributeSums.end(), 0.0); // replaces all 16 values w/ 0.0
 	}
 };
 
@@ -198,7 +201,7 @@ private:
 					   point.getValue(i), 2.0);
 		}
 
-		// min_dist = sqrt(sum); // 1. Sqrt potentially not necessary?
+		// 1. Sqrt potentially not necessary?
 		min_dist = sum;
 
 		for(int i = 1; i < K; i++)
@@ -208,7 +211,7 @@ private:
 				euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
 			}
 
-			// dist = sqrt(sum); // 1. Sqrt potentially not necessary?
+			// 1. Sqrt potentially not necessary?
 			sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
 
 			if(sum < min_dist)
@@ -265,12 +268,12 @@ public:
 			bool done = true;
 
 			// 5. Clear the sum of all attributes of all points in the cluster
-			for(int i = 0; i < K; i++)
+			for(int i = 0; i < K; i++) // 7 clusters
 			{
 				clusters[i].clearAttributeSums();
 			}
 
-			// associates each point to the nearest center
+			// Associate each point to the nearest center
 			for(int i = 0; i < total_points; i++)
 			{
 				int id_old_cluster = points[i].getCluster();
@@ -290,21 +293,14 @@ public:
 				clusters[id_nearest_center].addAttributeSums(points[i]);
 			}
 
-			// recalculating the center of each cluster
+			// Recalculate the center of each cluster
 			for(int i = 0; i < K; i++)
 			{
 				// 5. Calculate the new centroid based on attributeSums
-				int cluster_num_points = clusters[i].getTotalPoints();
-				if (cluster_num_points > 0) {
-					vector<double>& attributeSums = clusters[i].getAttributeSums();
-					for(int j = 0; j < total_attr; j++)
-					{
-						clusters[i].setCentralValue(j, attributeSums[j] / cluster_num_points);
-					}
-				}
+				clusters[i].updateCentralValues();
 			}
 
-			if(done == true) // Keep break condition
+			if(done == true)
 			{
 				break;
 			}
@@ -312,21 +308,17 @@ public:
 		cout << "Break in iteration " << iter << "\n\n";
         auto end = chrono::high_resolution_clock::now();
 
-		// shows elements of clusters
+
+		// Output Results
 		for(int i = 0; i < K; i++)
 		{
-			int total_points_cluster =  clusters[i].getTotalPoints();
-
 			cout << "############################################################# Cluster " << clusters[i].getID() + 1 << " ";
 			cout << "#############################################################" << endl;
-			for(int j = 0; j < total_points_cluster; j++)
+
+			vector<Point> allPoints =  clusters[i].getAllPoints();
+			for(Point p : allPoints)
 			{
-				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << "-> " << clusters[i].getPoint(j).getName() << endl;
-				// for(int p = 0; p < total_attr; p++)
-				// 	cout << clusters[i].getPoint(j).getValue(p) << " ";
-				// string point_name = clusters[i].getPoint(j).getName();
-				// if(point_name != "")
-				// 	cout << "- " << point_name;
+				cout << "Point " << p.getID() << "-> " << p.getName() << '\n';
 			}
 
 			cout << "Cluster values: ";
@@ -336,12 +328,9 @@ public:
 			
 			cout << "\n\n\n" << endl;
 		}
-
 		cout << "\n\n";
 		cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"μs\n";
-
 		cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
-
 		cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"μs\n";
 	}
 };
