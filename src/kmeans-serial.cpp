@@ -11,7 +11,8 @@
 #include <sstream> // Include the sstream header for stringstream
 #include <climits>
 #include <numeric>
-#include <map>
+#include <unordered_map>
+#include <memory> // for std::unique_ptr
 
 using namespace std;
 
@@ -56,6 +57,11 @@ public:
 		return values[index];
 	}
 
+	vector<double>& getValues()
+	{
+		return values;
+	}
+
 	int getTotalValues()
 	{
 		return total_attr;
@@ -76,9 +82,10 @@ class Cluster
 {
 private:
 	int id_cluster;
+	int total_attr;
 	vector<double> central_values;
-	map<int, Point> points; // 6. Make removing a Point O(1) operation
-	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster
+	unordered_map<int, Point> points; // 6. Make removing a Point O(1) operation; 11. change map to unordered_map
+	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr
 
 public:
 	// Constructor to initialize with a random existing point
@@ -99,7 +106,13 @@ public:
 	{
 		this->id_cluster = id_cluster;
 		this->central_values = central_values;
-		this->attributeSums.assign(total_attr, 0.0); // 5. Assign initial 16 values of 0.0 to attributeSums
+		this->total_attr = total_attr;
+		// 5. Assign initial 16 values of 0.0 to attributeSums
+		this->attributeSums.assign(total_attr, 0.0);
+
+		// 12. Allocate memory for attributeSums
+		// attributeSums = std::make_unique<double[]>(total_attr);
+		// std::fill(attributeSums.get(), attributeSums.get() + total_attr, 0.0);
 	}
 
 	void addPoint(Point point)
@@ -119,19 +132,23 @@ public:
 		return central_values[index];
 	}
 
+	// 7. Getter for central values (centroid)
+	vector<double>& getCentralValues()
+	{
+		return central_values;
+	}
+
 	void setCentralValue(int index, double value)
 	{
 		central_values[index] = value;
 	}
 
-    // 6. Method to get all points in the cluster
+    // 6. Getter for all points in the cluster
     vector<Point> getAllPoints()
     {
         vector<Point> allPoints;
         for (const auto& pair : points)
         {
-			// std::cout << "pair.first = " << pair.first << std::endl;
-			// std::cout << "pair.second = " << &pair.second << std::endl;
             allPoints.push_back(pair.second);
         }
         return allPoints;
@@ -147,16 +164,9 @@ public:
 		return id_cluster;
 	}
 
-	// 5. Getter for attributeSums
-	vector<double>& getAttributeSums() 
-	{
-		return attributeSums;
-	}
-
 	// 5. Update the central values based on attributeSums
 	void updateCentralValues() {
 		int total_points = getTotalPoints();
-		int total_attr = attributeSums.size();
 		if (total_points > 0) { // Safety check
 			for(int i = 0; i < total_attr; i++) // 16 attributes
 			{
@@ -177,7 +187,11 @@ public:
 	// 5. Clear attributeSums
 	void clearAttributeSums()
 	{
-		fill(attributeSums.begin(), attributeSums.end(), 0.0); // replaces all 16 values w/ 0.0
+		// replaces all 16 values w/ 0.0
+		fill(attributeSums.begin(), attributeSums.end(), 0.0);
+
+		// 12. Clear attributeSums
+		// fill(attributeSums.get(), attributeSums.get() + total_attr, 0.0);
 	}
 };
 
@@ -186,6 +200,7 @@ class KMeans
 private:
 	int K; // number of clusters
 	int total_attr, total_points, max_iterations;
+	// vector<unique_ptr<Cluster>> clusters;
 	vector<Cluster> clusters;
 
 	// return ID of nearest center (uses euclidean distance)
@@ -193,12 +208,13 @@ private:
 	{
 		double sum = 0.0, min_dist;
 		int id_cluster_center = 0;
-		vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
+		// vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
+		// vector<double> sums(K, 0.0);
 
 		for(int i = 0; i < total_attr; i++)
 		{
-			sum += pow(clusters[0].getCentralValue(i) -
-					   point.getValue(i), 2.0);
+			double diff = clusters[0].getCentralValue(i) - point.getValue(i);
+			sum += diff * diff; // 10. Replace pow with multiplication
 		}
 
 		// 1. Sqrt potentially not necessary?
@@ -206,15 +222,18 @@ private:
 
 		for(int i = 1; i < K; i++)
 		{
+			sum = 0.0;
+			const vector<double>& pointValues = point.getValues();
+			const vector<double>& clusterValues = clusters[i].getCentralValues();
 			for(int j = 0; j < total_attr; j++)
 			{
-				euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
+				// euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
+				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
+				sum += diff * diff; // 10. Replace pow with multiplication
 			}
 
-			// 1. Sqrt potentially not necessary?
-			sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
-
-			if(sum < min_dist)
+			// sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0);
+			if (sum < min_dist)
 			{
 				min_dist = sum;
 				id_cluster_center = i;
@@ -254,19 +273,20 @@ public:
 		// Assign initial centroids manually instead of randomly selecting points
 		for (int i = 0; i < K; i++) {
 			Cluster cluster(i, initial_centroids[i], total_attr);
-			clusters.push_back(cluster);
+			clusters.push_back(cluster); // 12. Use make_unique
 		}
 
 
         auto end_phase1 = chrono::high_resolution_clock::now();
 
 
+		// ############################# RUN KMEANS ############################## //
 		// 4. Turn while(true) into a for loop (still w/ break statement for stopping condition)
 		int iter = 1;
-		for (; iter <= max_iterations; iter++)
+		bool done = false;
+		for (; !done && iter <= max_iterations; iter++)
 		{
-			bool done = true;
-
+			done = true;
 			// 5. Clear the sum of all attributes of all points in the cluster
 			for(int i = 0; i < K; i++) // 7 clusters
 			{
@@ -298,11 +318,6 @@ public:
 			{
 				// 5. Calculate the new centroid based on attributeSums
 				clusters[i].updateCentralValues();
-			}
-
-			if(done == true)
-			{
-				break;
 			}
 		}
 		cout << "Break in iteration " << iter << "\n\n";
