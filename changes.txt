@@ -1,0 +1,113 @@
+Initial Serial Time:
+TOTAL EXECUTION TIME = 234402μs
+TIME PHASE 1 = 1μs
+TIME PHASE 2 = 234400μs
+
+------ Serial Changes ------
+1. Got rid of sqrt calculation
+TOTAL EXECUTION TIME = 226903μs
+TIME PHASE 1 = 4μs
+TIME PHASE 2 = 226899μs
+- Slight increase in speed (?)
+
+2. Got rid of first loop calculation when finding the getIDNearestCenter
+- Somehow got slower?? In the 300,000 - 350,000μs range
+
+3. Try putting results of calculations into a vector then sum over the vector
+- The idea is that this will help the compiler optimize the loop to unravel the loop safely
+TOTAL EXECUTION TIME = 262096μs
+TIME PHASE 1 = 6μs
+TIME PHASE 2 = 262090μs
+- Slightly slower or about the same.
+
+4. Turn the while(true) loop into a for loop (still w/ the break statement for the stopping condition)
+- Maybe the compiler will be able to further optimize this
+TOTAL EXECUTION TIME = 241863μs
+TIME PHASE 1 = 2μs
+TIME PHASE 2 = 241860μs
+- Maybe even slightly slower, mostly the same speed. Averaging ~240,000-250,000 microseconds
+
+5. Bigger Change. Add a new field to Cluster to keep track of the sum of each attribute of all points in the cluster
+- I realized there's redundant looping happening, where we loop through every point essentially twice - once to re-allocate
+    points to new centroids, and again to find the new centroid location based on the points in the cluster.
+- If we instead have some sort of vector or array holding the sums of attribute values for all points in the cluster,
+    we can reduce the overhead of looping/calculating the new centroid. We instead use this new 'attributeSums'.
+- This also adds in a few more methods to Cluster class.
+
+- Big speed up :D
+TOTAL EXECUTION TIME = 113989μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 113986μs
+
+6. Why does removePoint() loop through every point in the cluster?? Use a hashmap or key-value store...
+- Another decent speed up :D
+TOTAL EXECUTION TIME = 65565μs
+TIME PHASE 1 = 4μs
+TIME PHASE 2 = 65561μs
+
+7. Experimental idea - what if we had a counter that kept track of how many points we've compared the cluster to, then if that
+    reached some maximum/limit (total # of data points) then we perform the centroid update.
+- Maybe this reduces some redundant looping?
+TOTAL EXECUTION TIME = 12528μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 12525μs
+- Doesn't work as intended (buggy) and worse performance.
+
+8. Got rid of Change #3 and reverted back to using simple summation
+- Maybe for sequential it's introducing worse performance
+TOTAL EXECUTION TIME = 45821μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 45817μs
+- Got another speedup here.
+
+9. Return getValues() and getCentralValues() from Point and Cluster, respectively. Theory is to reduce overhead of constantly calling
+    the getValueAt(idx) method.
+TOTAL EXECUTION TIME = 45872μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 45868μs
+- Does not change much, if at all.
+
+10. Remove pow() and replace w/ simple multiplication
+- There's some information online about how pow(x, 2) is slower than x*x
+TOTAL EXECUTION TIME = 45288μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 45285μs
+- Maybe a TINY difference, but almost negligible.
+
+11. Change map<> to unordered_map<> since ordering is not necessary.
+TOTAL EXECUTION TIME = 44130μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 44126μs
+- Slight speedup, averaging ~44,000 microseconds
+
+12. Change vectors to unique_ptr for performance and reduced heap memory overhead.
+- Made it about the same time, maybe even slightly slower. Averaging ~45,500 microseconds
+- I reverted this change...
+
+
+
+
+------ Parallel (TBB) Changes ------
+#1. Parallel_for when assigning points to cluster
+TOTAL EXECUTION TIME = 44434μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 44431μs
+- Maybe a little more consistently under 45,00 microseconds?
+
+#2. Parallel_for when updating central values of cluster
+TOTAL EXECUTION TIME = 44539μs
+TIME PHASE 1 = 5μs
+TIME PHASE 2 = 44534μs
+- Not much difference.
+
+#3. Parallel_for when adding attribute sums to cluster attributeSums
+TOTAL EXECUTION TIME = 44039μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 44035μs
+- Not much difference.
+
+#4. Map-reduce the getIDNearestCenter() function.
+TOTAL EXECUTION TIME = 45253μs
+TIME PHASE 1 = 3μs
+TIME PHASE 2 = 45249μs
+- Not much speedup?? About the same.
