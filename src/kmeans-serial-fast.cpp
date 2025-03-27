@@ -12,9 +12,7 @@
 #include <climits>
 #include <numeric>
 #include <unordered_map>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
+#include <memory> // for std::unique_ptr
 
 using namespace std;
 
@@ -167,23 +165,23 @@ public:
 	}
 
 	// 5. Update the central values based on attributeSums
-    // #2. Parallel_for when updating central values
 	void updateCentralValues() {
 		int total_points = getTotalPoints();
-        if (total_points > 0) {
-            tbb::parallel_for(0, total_attr, 1, [&](int i) {
-                central_values[i] = attributeSums[i] / total_points;
-            });
-        }
+		if (total_points > 0) { // Safety check
+			for(int i = 0; i < total_attr; i++) // 16 attributes
+			{
+				central_values[i] = attributeSums[i] / total_points;
+			}
+		}
 	}
 
 	// 5. Add the attribute values of the point to attributeSums
-    // #3. Parallel_for when adding attribute sums to cluster attributeSums
 	void addAttributeSums(Point point)
 	{
-        tbb::parallel_for(0, total_attr, 1, [&](int i) {
-            attributeSums[i] += point.getValue(i);
-        });
+		for(int i = 0; i < point.getTotalValues(); i++)
+		{
+			attributeSums[i] += point.getValue(i);
+		}
 	}
 
 	// 5. Clear attributeSums
@@ -208,69 +206,41 @@ private:
 	// return ID of nearest center (uses euclidean distance)
 	int getIDNearestCenter(Point point)
 	{
-		// double sum = 0.0, min_dist;
-		// int id_cluster_center = 0;
-		// // vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
-		// // vector<double> sums(K, 0.0);
+		double sum = 0.0, min_dist;
+		int id_cluster_center = 0;
+		// vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
+		// vector<double> sums(K, 0.0);
 
-		// for(int i = 0; i < total_attr; i++)
-		// {
-		// 	double diff = clusters[0].getCentralValue(i) - point.getValue(i);
-		// 	sum += diff * diff; // 10. Replace pow with multiplication
-		// }
+		for(int i = 0; i < total_attr; i++)
+		{
+			double diff = clusters[0].getCentralValue(i) - point.getValue(i);
+			sum += diff * diff; // 10. Replace pow with multiplication
+		}
 
-		// // 1. Sqrt potentially not necessary?
-		// min_dist = sum;
+		// 1. Sqrt potentially not necessary?
+		min_dist = sum;
 
-		// for(int i = 1; i < K; i++)
-		// {
-		// 	sum = 0.0;
-		// 	const vector<double>& pointValues = point.getValues();
-		// 	const vector<double>& clusterValues = clusters[i].getCentralValues();
-		// 	for(int j = 0; j < total_attr; j++)
-		// 	{
-		// 		// euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
-		// 		double diff = clusters[i].getCentralValue(j) - point.getValue(j);
-		// 		sum += diff * diff; // 10. Replace pow with multiplication
-		// 	}
+		for(int i = 1; i < K; i++)
+		{
+			sum = 0.0;
+			const vector<double>& pointValues = point.getValues();
+			const vector<double>& clusterValues = clusters[i].getCentralValues();
+			for(int j = 0; j < total_attr; j++)
+			{
+				// euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
+				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
+				sum += diff * diff; // 10. Replace pow with multiplication
+			}
 
-		// 	// sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0);
-		// 	if (sum < min_dist)
-		// 	{
-		// 		min_dist = sum;
-		// 		id_cluster_center = i;
-		// 	}
-		// }
+			// sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0);
+			if (sum < min_dist)
+			{
+				min_dist = sum;
+				id_cluster_center = i;
+			}
+		}
 
-		// return id_cluster_center;
-    
-        // #4. Use parallel_reduce to find the nearest cluster
-        return tbb::parallel_reduce(
-            tbb::blocked_range<int>(0, K), 
-            std::make_pair(std::numeric_limits<double>::max(), -1),  // (min_dist, cluster_id)
-            [&](const tbb::blocked_range<int>& range, std::pair<double, int> local_best) {
-                for (int i = range.begin(); i < range.end(); i++) {
-                    double sum = 0.0;
-                    const vector<double>& clusterValues = clusters[i].getCentralValues();
-                    const vector<double>& pointValues = point.getValues();
-    
-                    for (int j = 0; j < total_attr; j++) {
-                        double diff = clusterValues[j] - pointValues[j];
-                        sum += diff * diff;
-                    }
-    
-                    // Update if we found a closer cluster
-                    if (sum < local_best.first) {
-                        local_best.first = sum;  // Update min_dist
-                        local_best.second = i;   // Update cluster_id
-                    }
-                }
-                return local_best;  // Return the best pair (min_dist, cluster_id) for this thread
-            },
-            [](std::pair<double, int> a, std::pair<double, int> b) {
-                return (a.first < b.first) ? a : b;  // Return the pair with the smaller distance
-            }
-        ).second;  // Extract the cluster_id from the final reduced pair
+		return id_cluster_center;
 	}
 
 public:
@@ -324,23 +294,24 @@ public:
 			}
 
 			// Associate each point to the nearest center
-            // #1. Use parallel_for to assign points to clusters
-            tbb::parallel_for(0, total_points, 1, [&](int i) {
-                int id_old_cluster = points[i].getCluster();
-                int id_nearest_center = getIDNearestCenter(points[i]);
-            
-                if(id_old_cluster != id_nearest_center)
-                {
-                    if(id_old_cluster != -1)
-                        clusters[id_old_cluster].removePoint(points[i].getID());
-            
-                    points[i].setCluster(id_nearest_center);
-                    clusters[id_nearest_center].addPoint(points[i]);
-                    done = false;
-                }
-            
-                clusters[id_nearest_center].addAttributeSums(points[i]);
-            });
+			for(int i = 0; i < total_points; i++)
+			{
+				int id_old_cluster = points[i].getCluster();
+				int id_nearest_center = getIDNearestCenter(points[i]);
+
+				if(id_old_cluster != id_nearest_center)
+				{
+					if(id_old_cluster != -1)
+						clusters[id_old_cluster].removePoint(points[i].getID());
+
+					points[i].setCluster(id_nearest_center);
+					clusters[id_nearest_center].addPoint(points[i]);
+					done = false;
+				}
+
+				// 5. Add the attributes of the point to the sum of all attributes of all points in the cluster
+				clusters[id_nearest_center].addAttributeSums(points[i]);
+			}
 
 			// Recalculate the center of each cluster
 			for(int i = 0; i < K; i++)
@@ -443,5 +414,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-
