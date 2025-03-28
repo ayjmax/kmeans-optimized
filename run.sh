@@ -20,5 +20,5 @@ cat ${DATASET} | bin/kmeans-serial-fast-no-cluster >> output.txt
 echo "------------------------- Parallel Simple -------------------------" >> output.txt
 cat ${DATASET} | bin/kmeans-parallel-simple >> output.txt
 
-# echo "------------------------- Parallel Fast -------------------------" >> output.txt
-# cat ${DATASET} | bin/kmeans-parallel-fast >> output.txt
+echo "------------------------- Parallel Fast -------------------------" >> output.txt
+cat ${DATASET} | bin/kmeans-parallel-fast >> output.txt
