@@ -100,32 +100,36 @@ private:
 	// Return ID of nearest center (uses euclidean distance)
 	int findNearestCluster(Point point)
 	{
-		pair<double, int> result = tbb::parallel_reduce(
-			tbb::blocked_range<int>(0, K), // Each thread gets 1 cluster to work on
-			pair<double, int>(numeric_limits<double>::max(), -1), // Initial result is maximum double value (for distance) and -1 (for the cluster ID)
-			[&](const tbb::blocked_range<int>& r, pair<double, int> local_result) { // Mapping lambda, takes in the range and a local result
-				for (int i = r.begin(); i != r.end(); ++i) {
-					double sum = 0.0;
-					double* c_vals = &centralValues[getClusterIndex(i, 0)];
-					double* p_vals = point.getValues().data();
+		double sum = 0.0, min_dist;
+ 		int id_cluster_center = 0;
+ 		for(int i = 0; i < total_attr; i++)
+		{
+			double diff = centralValues[i] - point.getValue(i);
+			sum += diff * diff;
+		}
 
-					#pragma omp simd // Trying OpenMP pragma
-					for(int j = 0; j < total_attr; j++)
-					{
-						double diff = c_vals[j] - p_vals[j];
-						sum += diff * diff;
-					}
-					if (sum < local_result.first)
-						local_result = {sum, i};
-				}
-				return local_result;
-			},
-			[](pair<double, int> a, pair<double, int> b) { // Reducing lambda, takes in 2 result pairs and returns the one with the smaller distance
-				return a.first < b.first ? a : b;
+		min_dist = sum;
+
+		for(int i = 1; i < K; i++)
+		{
+			sum = 0.0;
+			double* c_vals = &centralValues[getClusterIndex(i, 0)];
+			double* p_vals = point.getValues().data();
+ 
+			#pragma omp simd
+			for(int j = 0; j < total_attr; j++)
+			{
+				double diff = c_vals[j] - p_vals[j];
+				sum += diff * diff;
 			}
-		);
-
-		return result.second; // Will return the cluster ID with the smallest distance (resulting from the map-reduce)
+ 
+			if (sum < min_dist)
+			{
+				min_dist = sum;
+				id_cluster_center = i;
+			}
+		}
+		return id_cluster_center;
 	}
 
 public:
