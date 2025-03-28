@@ -1,4 +1,5 @@
 CXXFLAGS = -O3 # Optimization flags
+SIMDFLAGS = -mavx2
 LFLAGS = -L oneapi-tbb-2022.0.0/lib/intel64/gcc4.8 -ltbb # Library flags
 IFLAGS = -Ioneapi-tbb-2022.0.0/include
 # SFLAG= -fsanitize=address # not an option??? causes bugs when using this flag
@@ -9,7 +10,7 @@ serial:
 	g++ ${CXXFLAGS} ${SFLAG} -o bin/kmeans-serial src/kmeans-serial.cpp
 
 serial-fast:
-	g++ ${CXXFLAGS} ${SFLAG} -o bin/kmeans-serial-fast src/kmeans-serial-fast.cpp
+	g++ ${CXXFLAGS} ${SIMDFLAGS} ${SFLAG} -o bin/kmeans-serial-fast src/kmeans-serial-fast.cpp
 
 serial-fast-unroll:
 	g++ ${CXXFLAGS} ${SFLAG} -o bin/kmeans-serial-fast-unroll src/kmeans-serial-fast-unroll.cpp
