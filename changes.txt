@@ -134,5 +134,14 @@ TIME PHASE 1 = 4μs
 TIME PHASE 2 = 7680μs
 - VERY big increase in speed, nearly 5x speedup
 
+4. Removed Cluster class and replace w/ vectors
+TOTAL EXECUTION TIME = 7527μs
+TIME PHASE 1 = 1μs
+TIME PHASE 2 = 7526μs
+- Marginal speedup gain
 
-#?. Map-reduce the getIDNearestCenter() function.
+5. Map-reduce the getIDNearestCenter() function.
+TOTAL EXECUTION TIME = 37833μs
+TIME PHASE 1 = 1μs
+TIME PHASE 2 = 37831μs
+- SLOW. Will remove...
