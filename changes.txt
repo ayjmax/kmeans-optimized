@@ -84,6 +84,14 @@ TIME PHASE 2 = 44126μs
 - Made it about the same time, maybe even slightly slower. Averaging ~45,500 microseconds
 - I reverted this change...
 
+13. Remove per-cluster point storage entirely
+TOTAL EXECUTION TIME = 45903μs
+TIME PHASE 1 = 5μs
+TIME PHASE 2 = 45898μs
+- Approximately the same
+
+14. 
+
 
 
 
@@ -93,28 +101,21 @@ TIME PHASE 2 = 44126μs
 TOTAL EXECUTION TIME = 47735μs
 TIME PHASE 1 = 2μs
 TIME PHASE 2 = 47733μs
+- Reverted this change due to difficulty w/ unique_ptr. It also made very minimal speedup.
 
-2. Parallel_for when clearing cluster attributeSums
+2. Parallel_for when clearing cluster attributeSums/updating central values of cluster
 - No dependency between clusters, just clearing values
 TOTAL EXECUTION TIME = 47050μs
 TIME PHASE 1 = 2μs
 TIME PHASE 2 = 47047μs
 
-3. Why do we need to add/remove points to the cluster? Since we're keeping track of attributeSums,
-    we don't need info about every point in a cluster.
-- Change points vector to num_points
-- 
-TOTAL EXECUTION TIME = 50873μs
-TIME PHASE 1 = 2μs
-TIME PHASE 2 = 50870μs
+3. Added in thread local storage for changes in both attribute sums and num_points per cluster
+- Threads update their local storage, then for loop after the parallel_for update the actual clusters
+- Idea is to eliminate locking and contention
+TOTAL EXECUTION TIME = 7685μs
+TIME PHASE 1 = 4μs
+TIME PHASE 2 = 7680μs
+- VERY big increase in speed, nearly 5x speedup
 
-
-
-
-
-
-#?. Parallel_for when updating central values of cluster
-
-#?. Parallel_for when adding attribute sums to cluster attributeSums
 
 #?. Map-reduce the getIDNearestCenter() function.
