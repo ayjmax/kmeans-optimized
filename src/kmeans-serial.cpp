@@ -270,9 +270,7 @@ public:
 		// Output Results
 		for(int i = 0; i < K; i++)
 		{
-			int total_points_cluster =  clusters[i].getTotalPoints();
-
-			cout << "Cluster " << clusters[i].getID() + 1 << " values: ";
+			cout << "Cluster " << clusters[i].getID() + 1 << ": ";
 			for(int j = 0; j < total_values; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
 			cout << "\n\n";

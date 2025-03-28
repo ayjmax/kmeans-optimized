@@ -84,9 +84,8 @@ private:
 	int id_cluster;
 	int total_attr;
 	vector<double> central_values;
-	unordered_map<int, Point> points; // 6. Make removing a Point O(1) operation by using a map; 11. change map to unordered_map to improve performance
-	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr (revoked)
-
+	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr (revoke)
+	int num_points; // 13. Remove per-cluster point storage entirely
 
 public:
 	// Constructor to initialize with a random existing point
@@ -94,14 +93,11 @@ public:
 	{
 		this->id_cluster = id_cluster;
 		this->total_attr = total_attr;
+		this->num_points = 1; // 13. Remove per-cluster point storage entirely, replace with num_points
+		this->attributeSums.assign(total_attr, 0.0); // 5. Assign initial 16 values of 0.0 to attributeSums
 
 		for(int i = 0; i < total_attr; i++)
 			central_values.push_back(point.getValue(i));
-
-		points.insert(pair<int, Point>(point.getID(), point));
-
-		// 5. Assign initial 16 values of 0.0 to attributeSums
-		this->attributeSums.assign(total_attr, 0.0);
 	}
 
 	// New constructor to initialize with predefined central values
@@ -110,24 +106,8 @@ public:
 		this->id_cluster = id_cluster;
 		this->central_values = central_values;
 		this->total_attr = total_attr;
-		// 5. Assign initial 16 values of 0.0 to attributeSums
-		this->attributeSums.assign(total_attr, 0.0);
-
-		// 12. Allocate memory for attributeSums (revoked)
-		// attributeSums = std::make_unique<double[]>(total_attr);
-		// std::fill(attributeSums.get(), attributeSums.get() + total_attr, 0.0);
-	}
-
-	void addPoint(Point point)
-	{
-		points.insert(pair<int, Point>(point.getID(), point));
-	}
-
-	// 6. Remove a Point in O(1) time
-	bool removePoint(int id_point)
-	{
-		points.erase(id_point); 
-		return true;
+		this->attributeSums.assign(total_attr, 0.0); // 5. Assign initial 16 values of 0.0 to attributeSums
+		this->num_points = 0;
 	}
 
 	double getCentralValue(int index)
@@ -146,20 +126,17 @@ public:
 		central_values[index] = value;
 	}
 
-    // 6. Getter for all points in the cluster
-    vector<Point> getAllPoints()
-    {
-        vector<Point> allPoints;
-        for (const auto& pair : points)
-        {
-            allPoints.push_back(pair.second);
-        }
-        return allPoints;
-    }
+	void incrementNumPoints() {
+		num_points++;
+	}
 
-	int getTotalPoints()
+	void decrementNumPoints() {
+		num_points--;
+	}
+
+	int getNumPoints()
 	{
-		return points.size();
+		return num_points;
 	}
 
 	int getID()
@@ -169,11 +146,10 @@ public:
 
 	// 5. Update the central values based on attributeSums
 	void updateCentralValues() {
-		int total_points = getTotalPoints();
-		if (total_points > 0) { // Safety check
+		if (num_points > 0) { // Safety check
 			for(int i = 0; i < total_attr; i++) // 16 attributes
 			{
-				central_values[i] = attributeSums[i] / total_points;
+				central_values[i] = attributeSums[i] / num_points;
 			}
 		}
 	}
@@ -192,9 +168,6 @@ public:
 	{
 		// replaces all 16 values w/ 0.0
 		fill(attributeSums.begin(), attributeSums.end(), 0.0);
-
-		// 12. Clear attributeSums
-		// fill(attributeSums.get(), attributeSums.get() + total_attr, 0.0);
 	}
 };
 
@@ -203,7 +176,6 @@ class KMeans
 private:
 	int K; // number of clusters
 	int total_attr, total_points, max_iterations;
-	// vector<unique_ptr<Cluster>> clusters;
 	vector<Cluster> clusters;
 
 	// return ID of nearest center (uses euclidean distance)
@@ -211,8 +183,6 @@ private:
 	{
 		double sum = 0.0, min_dist;
 		int id_cluster_center = 0;
-		// vector<double> euclideanDistanceVals(total_attr, 0.0); // 3. Try putting results of calculations into a vector then sum over the vector
-		// vector<double> sums(K, 0.0);
 
 		for(int i = 0; i < total_attr; i++)
 		{
@@ -226,16 +196,12 @@ private:
 		for(int i = 1; i < K; i++)
 		{
 			sum = 0.0;
-			const vector<double>& pointValues = point.getValues();
-			const vector<double>& clusterValues = clusters[i].getCentralValues();
 			for(int j = 0; j < total_attr; j++)
 			{
-				// euclideanDistanceVals[j] = pow(clusters[i].getCentralValue(j) - point.getValue(j), 2.0);
 				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
 				sum += diff * diff; // 10. Replace pow with multiplication
 			}
 
-			// sum = accumulate(euclideanDistanceVals.begin(), euclideanDistanceVals.end(), 0.0);
 			if (sum < min_dist)
 			{
 				min_dist = sum;
@@ -255,13 +221,8 @@ public:
 		this->max_iterations = max_iterations;
 	}
 
-	void run(vector<Point> & points)
+	void initializeClusterCentroids(vector<Point> & points)
 	{
-        auto begin = chrono::high_resolution_clock::now();
-
-		if(K > total_points)
-			return;
-
 		// Manually initialize K cluster centroids with unique, random points
 		vector<int> prohibited_indexes;
 		for(int i = 0; i < K; i++)
@@ -281,7 +242,15 @@ public:
 				}
 			}
 		}
+		return;
+	}
 
+	void run(vector<Point> & points)
+	{
+		if(K > total_points)
+			return;
+        auto begin = chrono::high_resolution_clock::now();
+		initializeClusterCentroids(points);
         auto end_phase1 = chrono::high_resolution_clock::now();
 
 
@@ -307,10 +276,10 @@ public:
 				if(id_old_cluster != id_nearest_center)
 				{
 					if(id_old_cluster != -1)
-						clusters[id_old_cluster].removePoint(points[i].getID());
+						clusters[id_old_cluster].decrementNumPoints();
 
 					points[i].setCluster(id_nearest_center);
-					clusters[id_nearest_center].addPoint(points[i]);
+					clusters[id_nearest_center].incrementNumPoints();
 					done = false;
 				}
  
@@ -332,9 +301,8 @@ public:
 		// Output Results
 		for(int i = 0; i < K; i++)
 		{
-			int total_points_cluster =  clusters[i].getTotalPoints();
 
-			cout << "Cluster " << clusters[i].getID() + 1 << " values: ";
+			cout << "Cluster " << clusters[i].getID() + 1 << ": ";
 			for(int j = 0; j < total_attr; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
 			cout << "\n\n";
