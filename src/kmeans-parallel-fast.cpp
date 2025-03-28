@@ -434,7 +434,7 @@ public:
 
 int main(int argc, char *argv[])
 {
-	srand (time(NULL));
+	srand (123);
 
 	string first_line;
 	getline(cin, first_line);
