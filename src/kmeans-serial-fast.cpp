@@ -179,39 +179,6 @@ private:
 	int total_attr, total_points, max_iterations;
 	vector<Cluster> clusters;
 
-	double simdDistance(Point point, Cluster cluster)
-	{
-		// NOTE: We know vectors are guaranteed to be contiguous in memory, so we can access data directly
-		const double* c_vals = cluster.getCentralValues().data();
-		const double* p_vals = point.getValues().data();
-
-		// Initialize 4-wide vector of __m256d, which is 4 doubles
-		__m256d sum_vec = _mm256_setzero_pd(); // Initialized to 0
-
-		for (int i = 0; i < total_attr; i += 4) // 16 attributes, easily divisible by 4
-		{
-			// Load 4 doubles from c_vals and p_vals into 4-wide vectors
-			__m256d c_vec = _mm256_loadu_pd(c_vals + i);
-			__m256d p_vec = _mm256_loadu_pd(p_vals + i);
-
-			// Subtract attribute values
-			__m256d diff_vec = _mm256_sub_pd(c_vec, p_vec);
-
-			// Square the differences
-			__m256d sq_diff_vec = _mm256_mul_pd(diff_vec, diff_vec);
-
-			// Add to sum_vec
-			sum_vec = _mm256_add_pd(sum_vec, sq_diff_vec);
-		}
-
-		// Reduce the 4-double vector into a single double
-		double temp[4];
-		_mm256_storeu_pd(temp, sum_vec);
-		double dist = temp[0] + temp[1] + temp[2] + temp[3];
-		
-		return dist;
-	}
-
 	// return ID of nearest center (uses euclidean distance)
 	int getIDNearestCenter(Point point)
 	{
@@ -227,15 +194,18 @@ private:
 		// 1. Sqrt potentially not necessary?
 		min_dist = sum;
 
+		double* p_vals = point.getValues().data();
 		for(int i = 1; i < K; i++)
 		{
-			// sum = 0.0;
-			// for(int j = 0; j < total_attr; j++)
-			// {
-			// 	double diff = clusters[i].getCentralValue(j) - point.getValue(j);
-			// 	sum += diff * diff; // 10. Replace pow with multiplication
-			// }
-			sum = simdDistance(point, clusters[i]);
+			sum = 0.0;
+			double* c_vals = clusters[i].getCentralValues().data();
+
+			#pragma omp simd
+			for(int j = 0; j < total_attr; j++)
+			{
+				double diff = c_vals[j] - p_vals[j];
+				sum += diff * diff; // 10. Replace pow with multiplication
+			}
 
 			if (sum < min_dist)
 			{
