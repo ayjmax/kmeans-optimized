@@ -84,21 +84,24 @@ private:
 	int id_cluster;
 	int total_attr;
 	vector<double> central_values;
-	unordered_map<int, Point> points; // 6. Make removing a Point O(1) operation; 11. change map to unordered_map
-	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr
+	unordered_map<int, Point> points; // 6. Make removing a Point O(1) operation by using a map; 11. change map to unordered_map to improve performance
+	vector<double> attributeSums; // 5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr (revoked)
+
 
 public:
 	// Constructor to initialize with a random existing point
-	Cluster(int id_cluster, Point point)
+	Cluster(int id_cluster, Point point, int total_attr)
 	{
 		this->id_cluster = id_cluster;
-
-		int total_attr = point.getTotalValues();
+		this->total_attr = total_attr;
 
 		for(int i = 0; i < total_attr; i++)
 			central_values.push_back(point.getValue(i));
 
 		points.insert(pair<int, Point>(point.getID(), point));
+
+		// 5. Assign initial 16 values of 0.0 to attributeSums
+		this->attributeSums.assign(total_attr, 0.0);
 	}
 
 	// New constructor to initialize with predefined central values
@@ -110,7 +113,7 @@ public:
 		// 5. Assign initial 16 values of 0.0 to attributeSums
 		this->attributeSums.assign(total_attr, 0.0);
 
-		// 12. Allocate memory for attributeSums
+		// 12. Allocate memory for attributeSums (revoked)
 		// attributeSums = std::make_unique<double[]>(total_attr);
 		// std::fill(attributeSums.get(), attributeSums.get() + total_attr, 0.0);
 	}
@@ -178,7 +181,7 @@ public:
 	// 5. Add the attribute values of the point to attributeSums
 	void addAttributeSums(Point point)
 	{
-		for(int i = 0; i < point.getTotalValues(); i++)
+		for(int i = 0; i < total_attr; i++)
 		{
 			attributeSums[i] += point.getValue(i);
 		}
@@ -259,23 +262,25 @@ public:
 		if(K > total_points)
 			return;
 
-		// Manually initialize K cluster centroids with predefined values
-		vector<vector<double>> initial_centroids = {
-			{43266, 772.889, 287.013, 193.007, 1.48706, 0.740125, 43691, 234.708, 0.77649, 0.990273, 0.91017, 0.817763, 0.00663368, 0.00182997, 0.668736, 0.994449},
-			{77590, 1074.37, 409.117, 245.292, 1.66788, 0.800326, 79050, 314.31, 0.798884, 0.981531, 0.844714, 0.768264, 0.0052728, 0.00113309, 0.59023, 0.984431},
-			{75720, 1097.63, 390.076, 248.122, 1.57211, 0.771617, 77033, 310.499, 0.703848, 0.982955, 0.789781, 0.795997, 0.00515155, 0.00127575, 0.633612, 0.996108},
-			{37064, 710.701, 265.11, 178.209, 1.48763, 0.740362, 37390, 217.236, 0.706142, 0.991281, 0.922122, 0.819417, 0.00715277, 0.00198918, 0.671444, 0.998863},
-			{71882, 1040.31, 408.824, 226.343, 1.80621, 0.832753, 73208, 302.528, 0.723516, 0.981887, 0.834644, 0.739996, 0.00568743, 0.00105199, 0.547594, 0.989071},
-			{52187, 975.927, 311.194, 215.771, 1.44224, 0.720587, 53664, 257.772, 0.709043, 0.972477, 0.688553, 0.828333, 0.00596305, 0.00173169, 0.686136, 0.989575},
-			{80724, 1071.17, 416.301, 247.545, 1.68172, 0.804, 81330, 320.595, 0.799723, 0.992549, 0.884088, 0.770103, 0.00515709, 0.00111887, 0.593058, 0.997358}
-		};
+		// Manually initialize K cluster centroids with unique, random points
+		vector<int> prohibited_indexes;
+		for(int i = 0; i < K; i++)
+		{
+			while(true)
+			{
+				int index_point = rand() % total_points; // Random seed is defined in main
 
-		// Assign initial centroids manually instead of randomly selecting points
-		for (int i = 0; i < K; i++) {
-			Cluster cluster(i, initial_centroids[i], total_attr);
-			clusters.push_back(cluster); // 12. Use make_unique
+				if(find(prohibited_indexes.begin(), prohibited_indexes.end(),
+						index_point) == prohibited_indexes.end())
+				{
+					prohibited_indexes.push_back(index_point);
+					points[index_point].setCluster(i);
+					Cluster cluster(i, points[index_point], total_attr);
+					clusters.push_back(cluster);
+					break;
+				}
+			}
 		}
-
 
         auto end_phase1 = chrono::high_resolution_clock::now();
 
@@ -308,7 +313,7 @@ public:
 					clusters[id_nearest_center].addPoint(points[i]);
 					done = false;
 				}
-
+ 
 				// 5. Add the attributes of the point to the sum of all attributes of all points in the cluster
 				clusters[id_nearest_center].addAttributeSums(points[i]);
 			}
@@ -327,32 +332,22 @@ public:
 		// Output Results
 		for(int i = 0; i < K; i++)
 		{
-			cout << "############################################################# Cluster " << clusters[i].getID() + 1 << " ";
-			cout << "#############################################################" << endl;
+			int total_points_cluster =  clusters[i].getTotalPoints();
 
-			vector<Point> allPoints =  clusters[i].getAllPoints();
-			for(Point p : allPoints)
-			{
-				cout << "Point " << p.getID() << "-> " << p.getName() << '\n';
-			}
-
-			cout << "Cluster values: ";
-
+			cout << "Cluster " << clusters[i].getID() + 1 << " values: ";
 			for(int j = 0; j < total_attr; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
-			
-			cout << "\n\n\n" << endl;
+			cout << "\n\n";
 		}
-		cout << "\n\n";
-		cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"μs\n";
-		cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
-		cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"μs\n";
+        cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
+        cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
+        cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n\n\n" << endl;
 	}
 };
 
 int main(int argc, char *argv[])
 {
-	srand (time(NULL));
+	srand (123); // Set seed for reproducibility
 
 	string first_line;
 	getline(cin, first_line);
@@ -362,19 +357,14 @@ int main(int argc, char *argv[])
 		first_line.erase(0, 3);
 	}
 
-	cout << "first_line = " << first_line << endl;
+	// Print dataset info
+	cout << "Dataset info: " << first_line << endl;
 
 	// Use stringstream to split the first line into integers
 	stringstream ss(first_line);
 	int total_points, total_attr, K, max_iterations, has_name;
 	ss >> total_points >> total_attr >> K >> max_iterations >> has_name;
 
-	// Print all the inputed values
-	cout << "total_points = " << total_points << endl;
-	cout << "total_attr = " << total_attr << endl;
-	cout << "K = " << K << endl;
-	cout << "max_iterations = " << max_iterations << endl;
-	cout << "has_name = " << has_name << endl;
 
 	if (total_points == 0 || total_attr == 0 || K == 0 || max_iterations == 0)
 	{
@@ -382,9 +372,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	// Read in points from dataset
 	vector<Point> points;
 	string point_name;
-
 	for(int i = 0; i < total_points; i++)
 	{
 		vector<double> values;
@@ -402,15 +392,8 @@ int main(int argc, char *argv[])
 			Point p(i, values, point_name);
 			points.push_back(p);
 		}
-		else
-		{
-			Point p(i, values);
-			points.push_back(p);
-		}
 	}
-
 	KMeans kmeans(K, total_points, total_attr, max_iterations);
 	kmeans.run(points);
-
 	return 0;
 }

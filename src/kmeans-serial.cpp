@@ -8,6 +8,7 @@
 #include <time.h>
 #include <algorithm>
 #include <chrono>
+#include <sstream> // Include the sstream header for stringstream
 
 using namespace std;
 
@@ -194,14 +195,13 @@ public:
 		if(K > total_points)
 			return;
 
+		// Manually initialize K cluster centroids with unique, random points
 		vector<int> prohibited_indexes;
-
-		// choose K distinct values for the centers of the clusters
 		for(int i = 0; i < K; i++)
 		{
 			while(true)
 			{
-				int index_point = rand() % total_points;
+				int index_point = rand() % total_points; // Random seed is defined in main
 
 				if(find(prohibited_indexes.begin(), prohibited_indexes.end(),
 						index_point) == prohibited_indexes.end())
@@ -216,8 +216,9 @@ public:
 		}
         auto end_phase1 = chrono::high_resolution_clock::now();
 
-		int iter = 1;
 
+
+		int iter = 1;
 		while(true)
 		{
 			bool done = true;
@@ -266,46 +267,47 @@ public:
 		}
         auto end = chrono::high_resolution_clock::now();
 
-		// shows elements of clusters
+		// Output Results
 		for(int i = 0; i < K; i++)
 		{
 			int total_points_cluster =  clusters[i].getTotalPoints();
 
-			cout << "Cluster " << clusters[i].getID() + 1 << endl;
-			for(int j = 0; j < total_points_cluster; j++)
-			{
-				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << ": ";
-				for(int p = 0; p < total_values; p++)
-					cout << clusters[i].getPoint(j).getValue(p) << " ";
-
-				string point_name = clusters[i].getPoint(j).getName();
-
-				if(point_name != "")
-					cout << "- " << point_name;
-
-				cout << endl;
-			}
-
-			cout << "Cluster values: ";
-
+			cout << "Cluster " << clusters[i].getID() + 1 << " values: ";
 			for(int j = 0; j < total_values; j++)
 				cout << clusters[i].getCentralValue(j) << " ";
-
 			cout << "\n\n";
-            cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"\n";
-            cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"\n";
-            cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"\n";
 		}
+		cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
+		cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
+		cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n\n\n" << endl;
 	}
 };
 
 int main(int argc, char *argv[])
 {
-	srand (time(NULL));
+	srand (123); // Set seed for reproducibility
 
-	int total_points, total_values, K, max_iterations, has_name;
+	string first_line;
+	getline(cin, first_line);
 
-	cin >> total_points >> total_values >> K >> max_iterations >> has_name;
+	// IMPORTANT: Remove BOM if it exists
+	if (first_line.size() > 0 && first_line[0] == '\xEF' && first_line[1] == '\xBB' && first_line[2] == '\xBF') {
+		first_line.erase(0, 3);
+	}
+
+	// Use stringstream to split the first line into integers
+	stringstream ss(first_line);
+	int total_points, total_attr, K, max_iterations, has_name;
+	ss >> total_points >> total_attr >> K >> max_iterations >> has_name;
+
+	// Print all the inputed values
+	cout << "Dataset info: " << first_line << endl;
+
+	if (total_points == 0 || total_attr == 0 || K == 0 || max_iterations == 0)
+	{
+		cout << "Invalid input" << endl;
+		return 1;
+	}
 
 	vector<Point> points;
 	string point_name;
@@ -314,7 +316,7 @@ int main(int argc, char *argv[])
 	{
 		vector<double> values;
 
-		for(int j = 0; j < total_values; j++)
+		for(int j = 0; j < total_attr; j++)
 		{
 			double value;
 			cin >> value;
@@ -334,7 +336,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	KMeans kmeans(K, total_points, total_values, max_iterations);
+	KMeans kmeans(K, total_points, total_attr, max_iterations);
 	kmeans.run(points);
 
 	return 0;
