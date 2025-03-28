@@ -84,9 +84,9 @@ class KMeans
 private:
 	int K; // number of clusters
 	int total_attr, total_points, max_iterations;
-	vector<double> centralValues;     // K * total_attr
-	vector<double> attributeSums;     // K * total_attr
-	vector<int>    clusterCounts;     // K
+	vector<double> central_values;     // K * total_attr
+	vector<double> attribute_sums;     // K * total_attr
+	vector<int>    cluster_counts;     // K
 
 	// Helper function to get index in flattened vectors
 	int getClusterIndex(int cluster_id, int attr) {
@@ -102,7 +102,7 @@ private:
 		// Calculate distance to first cluster
 		for(int i = 0; i < total_attr; i++)
 		{
-			double diff = centralValues[i] - point.getValue(i);
+			double diff = central_values[i] - point.getValue(i);
 			sum += diff * diff;
 		}
 		min_dist = sum;
@@ -111,7 +111,7 @@ private:
 		for(int i = 1; i < K; i++)
 		{
 			sum = 0.0;
-			double* c_vals = &centralValues[getClusterIndex(i, 0)];
+			double* c_vals = &central_values[getClusterIndex(i, 0)];
 
 			#pragma omp simd
 			for(int j = 0; j < total_attr; j++)
@@ -139,9 +139,9 @@ public:
 		this->max_iterations = max_iterations;
 		
 		// Initialize vectors with correct sizes
-		centralValues.resize(K * total_attr);
-		attributeSums.resize(K * total_attr);
-		clusterCounts.resize(K);
+		central_values.resize(K * total_attr);
+		attribute_sums.resize(K * total_attr);
+		cluster_counts.resize(K);
 	}
 
 	void initializeClusterCentroids(vector<Point> & points)
@@ -159,11 +159,11 @@ public:
 				{
 					prohibited_indexes.push_back(index_point);
 					points[index_point].setCluster(i);
-					clusterCounts[i] = 1;
+					cluster_counts[i] = 1;
 					
 					// Copy point values to central values
 					for(int j = 0; j < total_attr; j++) {
-						centralValues[getClusterIndex(i, j)] = points[index_point].getValue(j);
+						central_values[getClusterIndex(i, j)] = points[index_point].getValue(j);
 					}
 					break;
 				}
@@ -190,7 +190,7 @@ public:
 			done = true;
 
 			// Clear attribute sums at start of iteration
-			fill(attributeSums.begin(), attributeSums.end(), 0.0);
+			fill(attribute_sums.begin(), attribute_sums.end(), 0.0);
 
 			// Associate each point to the nearest center
 			for(int i = 0; i < total_points; i++)
@@ -201,16 +201,16 @@ public:
 				if(id_old_cluster != id_nearest_center)
 				{
 					if(id_old_cluster != -1)
-						clusterCounts[id_old_cluster]--;
+						cluster_counts[id_old_cluster]--;
 
 					points[i].setCluster(id_nearest_center);
-					clusterCounts[id_nearest_center]++;
+					cluster_counts[id_nearest_center]++;
 					done = false;
 				}
  
 				// Add point values to attribute sums
 				double* p_vals = points[i].getValues().data();
-				double* sums = &attributeSums[getClusterIndex(id_nearest_center, 0)];
+				double* sums = &attribute_sums[getClusterIndex(id_nearest_center, 0)];
 				#pragma omp simd // Trying OpenMP pragma to see if it helps
 				for(int j = 0; j < total_attr; j++) {
 					sums[j] += p_vals[j];
@@ -220,12 +220,12 @@ public:
 			// Recalculate the center of each cluster
 			for(int i = 0; i < K; i++)
 			{
-				if(clusterCounts[i] > 0) {
-					double* cent_vals = &centralValues[getClusterIndex(i, 0)];
-					double* sums = &attributeSums[getClusterIndex(i, 0)];
+				if(cluster_counts[i] > 0) {
+					double* cent_vals = &central_values[getClusterIndex(i, 0)];
+					double* sums = &attribute_sums[getClusterIndex(i, 0)];
 					#pragma omp simd // Trying OpenMP pragma to see if it helps
 					for(int j = 0; j < total_attr; j++) {
-						cent_vals[j] = sums[j] / clusterCounts[i];
+						cent_vals[j] = sums[j] / cluster_counts[i];
 					}
 				}
 			}
@@ -239,7 +239,7 @@ public:
 		{
 			cout << "Cluster " << i + 1 << ": ";
 			for(int j = 0; j < total_attr; j++)
-				cout << centralValues[getClusterIndex(i, j)] << " ";
+				cout << central_values[getClusterIndex(i, j)] << " ";
 			cout << "\n\n";
 		}
         cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
