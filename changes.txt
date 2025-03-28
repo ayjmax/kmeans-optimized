@@ -90,7 +90,20 @@ TIME PHASE 1 = 5μs
 TIME PHASE 2 = 45898μs
 - Approximately the same
 
-14. 
+14. Trying SIMD operations for calculating distance between points
+- Trying to use AVX2 SIMD operations for faster calculations in distance calculations
+TOTAL EXECUTION TIME = 197412μs
+TIME PHASE 1 = 5μs
+TIME PHASE 2 = 197406μs
+- MUCH slower. Why could this be? Maybe -O3 flag interfering w/ SIMD operations...
+
+15. Trying OpenMP pragma instead
+TOTAL EXECUTION TIME = 49304μs
+TIME PHASE 1 = 4μs
+TIME PHASE 2 = 49300μs
+- Honestly not much difference...maybe even a bit slower.
+
+
 
 
 
