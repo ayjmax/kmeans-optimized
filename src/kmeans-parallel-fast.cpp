@@ -83,126 +83,19 @@ public:
 	}
 };
 
-class Cluster
-{
-private:
-	int id_cluster;
-	int total_attr;
-	vector<double> central_values;
-	vector<double> attributeSums; // S5. Add a vector to store the sum of all attributes of all points in the cluster; 12. make this a unique_ptr
-	int num_points;
-
-public:
-	// Constructor to initialize with a random existing point
-	Cluster(int id_cluster, Point point, int total_attr)
-	{
-		this->id_cluster = id_cluster;
-		this->total_attr = total_attr;
-		this->num_points = 1; // NOTE: When using this constructor, one point is already in the cluster
-		this->attributeSums.assign(total_attr, 0.0);
-
-		for(int i = 0; i < total_attr; i++)
-			central_values.push_back(point.getValue(i));
-	}
-
-	// New constructor to initialize with predefined central values
-	Cluster (int id_cluster, vector<double>& central_values, int total_attr)
-	{
-		this->id_cluster = id_cluster;
-		this->central_values = central_values;
-		this->total_attr = total_attr;
-		this->attributeSums.assign(total_attr, 0.0);
-		this->num_points = 0;
-	}
-
-	// P3
-	bool setNumPoints(int num_points) {
-		this->num_points = num_points;
-		return true;
-	}
-
-	// P3
-	void addToNumPoints(int points_diff) {
-		num_points += points_diff;
-	}
-
-	// P3
-	int getNumPoints() {
-		return num_points;
-	}
-
-	void incrementNumPoints() {
-		num_points++;
-	}
-
-	void decrementNumPoints() {
-		num_points--;
-	}
-
-	double getCentralValue(int index)
-	{
-		return central_values[index];
-	}
-
-	// S7. Getter for central values (centroid)
-	vector<double>& getCentralValues()
-	{
-		return central_values;
-	}
-
-	void setCentralValue(int index, double value)
-	{
-		central_values[index] = value;
-	}
-
-	int getTotalPoints()
-	{
-		return num_points;
-	}
-
-	int getID()
-	{
-		return id_cluster;
-	}
-
-	// S5. Update the central values based on attributeSums
-	void updateCentralValues() {
-		if (num_points <= 0) return;
-		for(int i = 0; i < total_attr; i++) // 16 attributes
-		{
-			central_values[i] = attributeSums[i] / num_points;
-		}
-	}
-
-	// S5. Add the attribute values of the point to attributeSums
-	void addAttributeSums(Point point)
-	{
-		for(int i = 0; i < total_attr; i++)
-		{
-			attributeSums[i] += point.getValue(i);
-		}
-	}
-
-	void addAttributeSums(vector<double> attributeSums)
-	{
-		for(int i = 0; i < total_attr; i++) {
-			this->attributeSums[i] += attributeSums[i];
-		}
-	}
-
-	// S5. Clear attributeSums
-	void clearAttributeSums()
-	{
-		fill(attributeSums.begin(), attributeSums.end(), 0.0);
-	}
-};
-
 class KMeans
 {
 private:
 	int K; // number of clusters
 	int total_attr, total_points, max_iterations;
-	vector<Cluster> clusters;
+	vector<double> centralValues;     // K * total_attr
+	vector<double> attributeSums;     // K * total_attr
+	vector<int>    clusterCounts;     // K
+
+	// Helper function to get index in flattened vectors
+	int getClusterIndex(int cluster_id, int attr) {
+		return cluster_id * total_attr + attr;
+	}
 
 	// Return ID of nearest center (uses euclidean distance)
 	int findNearestCluster(Point point)
@@ -212,7 +105,7 @@ private:
 
 		for(int i = 0; i < total_attr; i++)
 		{
-			double diff = clusters[0].getCentralValue(i) - point.getValue(i);
+			double diff = centralValues[i] - point.getValue(i);
 			sum += diff * diff;
 		}
 
@@ -221,9 +114,13 @@ private:
 		for(int i = 1; i < K; i++)
 		{
 			sum = 0.0;
+			double* c_vals = &centralValues[getClusterIndex(i, 0)];
+			double* p_vals = point.getValues().data();
+
+			#pragma omp simd
 			for(int j = 0; j < total_attr; j++)
 			{
-				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
+				double diff = c_vals[j] - p_vals[j];
 				sum += diff * diff;
 			}
 
@@ -244,6 +141,11 @@ public:
 		this->total_points = total_points;
 		this->total_attr = total_attr;
 		this->max_iterations = max_iterations;
+		
+		// Initialize vectors with correct sizes
+		centralValues.resize(K * total_attr);
+		attributeSums.resize(K * total_attr);
+		clusterCounts.resize(K);
 	}
 
 	void initializeClusterCentroids(vector<Point> & points)
@@ -261,8 +163,12 @@ public:
 				{
 					prohibited_indexes.push_back(index_point);
 					points[index_point].setCluster(i);
-					Cluster cluster(i, points[index_point], total_attr);
-					clusters.push_back(cluster);
+					clusterCounts[i] = 1;
+					
+					// Copy point values to central values
+					for(int j = 0; j < total_attr; j++) {
+						centralValues[getClusterIndex(i, j)] = points[index_point].getValue(j);
+					}
 					break;
 				}
 			}
@@ -313,8 +219,10 @@ public:
 
 				// P3
 				auto& local_sums = thread_local_attribute_sums.local();
+				double* p_vals = points[i].getValues().data();
+				#pragma omp simd
 				for (int j = 0; j < total_attr; j++) {
-					local_sums[id_nearest_center][j] += points[i].getValue(j);
+					local_sums[id_nearest_center][j] += p_vals[j];
 				}
 			});
 
@@ -324,21 +232,33 @@ public:
 					if (done && local_diffs[i] != 0) { // Moved 'done' check here to remove race condition/contention
 						done = false;
 					}
-					clusters[i].addToNumPoints(local_diffs[i]);
+					clusterCounts[i] += local_diffs[i];
 				}
 			}
 
-			// P3
+			// P3. Update attribute sums
 			for (const auto& local_sums : thread_local_attribute_sums) {
 				for (int i = 0; i < K; i++) {
-					clusters[i].addAttributeSums(local_sums[i]);
+					double* sums = &attributeSums[getClusterIndex(i, 0)];
+					#pragma omp simd
+					for (int j = 0; j < total_attr; j++) {
+						sums[j] += local_sums[i][j];
+					}
 				}
 			}
 
 			// P2. parallelize clearing attributeSums
 			tbb::parallel_for(0, K, 1, [&](int i) {
-				clusters[i].updateCentralValues();
-				clusters[i].clearAttributeSums();
+				if(clusterCounts[i] > 0) {
+					double* cent = &centralValues[getClusterIndex(i, 0)];
+					double* sums = &attributeSums[getClusterIndex(i, 0)];
+					#pragma omp simd
+					for(int j = 0; j < total_attr; j++) {
+						cent[j] = sums[j] / clusterCounts[i];
+					}
+				}
+				// Clear attribute sums for next iteration
+				fill(&attributeSums[getClusterIndex(i, 0)], &attributeSums[getClusterIndex(i, total_attr)], 0.0);
 			});
 		}
 
@@ -348,9 +268,9 @@ public:
 		// Output Results
 		for(int i = 0; i < K; i++)
 		{
-			cout << "Cluster " << clusters[i].getID() + 1 << ": ";
+			cout << "Cluster " << i + 1 << ": ";
 			for(int j = 0; j < total_attr; j++)
-				cout << clusters[i].getCentralValue(j) << " ";
+				cout << centralValues[getClusterIndex(i, j)] << " ";
 			cout << "\n\n";
 		}
 		cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
