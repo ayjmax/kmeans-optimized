@@ -88,26 +88,33 @@ TIME PHASE 2 = 44126μs
 
 
 ------ Parallel (TBB) Changes ------
-#1. Parallel_for when assigning points to cluster
-TOTAL EXECUTION TIME = 44434μs
-TIME PHASE 1 = 3μs
-TIME PHASE 2 = 44431μs
-- Maybe a little more consistently under 45,00 microseconds?
+1. Parallel_for when assigning points to cluster w/ locks for modifying attributeSums and points in a cluster
+- Had to change cluster vector in KMeans class to vector of unique_ptr
+TOTAL EXECUTION TIME = 47735μs
+TIME PHASE 1 = 2μs
+TIME PHASE 2 = 47733μs
 
-#2. Parallel_for when updating central values of cluster
-TOTAL EXECUTION TIME = 44539μs
-TIME PHASE 1 = 5μs
-TIME PHASE 2 = 44534μs
-- Not much difference.
+2. Parallel_for when clearing cluster attributeSums
+- No dependency between clusters, just clearing values
+TOTAL EXECUTION TIME = 47050μs
+TIME PHASE 1 = 2μs
+TIME PHASE 2 = 47047μs
 
-#3. Parallel_for when adding attribute sums to cluster attributeSums
-TOTAL EXECUTION TIME = 44039μs
-TIME PHASE 1 = 3μs
-TIME PHASE 2 = 44035μs
-- Not much difference.
+3. Why do we need to add/remove points to the cluster? Since we're keeping track of attributeSums,
+    we don't need info about every point in a cluster.
+- Change points vector to num_points
+- 
+TOTAL EXECUTION TIME = 50873μs
+TIME PHASE 1 = 2μs
+TIME PHASE 2 = 50870μs
 
-#4. Map-reduce the getIDNearestCenter() function.
-TOTAL EXECUTION TIME = 45253μs
-TIME PHASE 1 = 3μs
-TIME PHASE 2 = 45249μs
-- Not much speedup?? About the same.
+
+
+
+
+
+#?. Parallel_for when updating central values of cluster
+
+#?. Parallel_for when adding attribute sums to cluster attributeSums
+
+#?. Map-reduce the getIDNearestCenter() function.
