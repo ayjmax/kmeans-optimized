@@ -11,6 +11,9 @@ cat ${DATASET} | bin/kmeans-serial >> output.txt
 echo "------------------------- Serial Fast -------------------------" >> output.txt
 cat ${DATASET} | bin/kmeans-serial-fast >> output.txt
 
+echo "------------------------- Serial Fast Unroll -------------------------" >> output.txt
+cat ${DATASET} | bin/kmeans-serial-fast-unroll >> output.txt
+
 echo "------------------------- Parallel Simple -------------------------" >> output.txt
 cat ${DATASET} | bin/kmeans-parallel-simple >> output.txt
 
