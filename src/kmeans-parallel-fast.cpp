@@ -18,6 +18,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <mutex>
+#include <tbb/global_control.h> // to control the number of threads
 
 using namespace std;
 
@@ -279,8 +280,6 @@ public:
 
 int main(int argc, char *argv[])
 {
-	srand (123); // For reproducibility
-
 	string first_line;
 	getline(cin, first_line);
 
@@ -301,6 +300,8 @@ int main(int argc, char *argv[])
 		cout << "Invalid input" << endl;
 		return 1;
 	}
+
+
 
 	vector<Point> points;
 	string point_name;
@@ -329,8 +330,18 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	KMeans kmeans(K, total_points, total_attr, max_iterations);
-	kmeans.run(points);
+	vector<Point> backup_points = points; // make a backup copy
+
+	// for (int threads : {1, 2, 4, 8, 16, 32, 50, 100, 500}) {
+	// 	tbb::global_control c(tbb::global_control::max_allowed_parallelism, threads);
+		srand (123); // For reproducibility
+
+		points = backup_points; // restore the backup copy
+
+		// cout << "Threads: " << threads << endl;
+		KMeans kmeans(K, total_points, total_attr, max_iterations);
+		kmeans.run(points);
+	// }
 
 	return 0;
 }
