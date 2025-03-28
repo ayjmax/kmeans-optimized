@@ -254,18 +254,13 @@ public:
         auto end_phase1 = chrono::high_resolution_clock::now();
 
 
-		// ############################# RUN KMEANS ############################## //
+		// ======================= RUN KMEANS ========================= //
 		// 4. Turn while(true) into a for loop (still w/ break statement for stopping condition)
 		int iter = 1;
 		bool done = false;
 		for (; !done && iter <= max_iterations; iter++)
 		{
 			done = true;
-			// 5. Clear the sum of all attributes of all points in the cluster
-			for(int i = 0; i < K; i++) // 7 clusters
-			{
-				clusters[i].clearAttributeSums();
-			}
 
 			// Associate each point to the nearest center
 			for(int i = 0; i < total_points; i++)
@@ -290,8 +285,9 @@ public:
 			// Recalculate the center of each cluster
 			for(int i = 0; i < K; i++)
 			{
-				// 5. Calculate the new centroid based on attributeSums
+				// 5. Calculate the new centroid based on attributeSums and clear afterwards
 				clusters[i].updateCentralValues();
+				clusters[i].clearAttributeSums();
 			}
 		}
 		cout << "Break in iteration " << iter << "\n\n";
