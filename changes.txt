@@ -104,7 +104,11 @@ TIME PHASE 2 = 49300μs
 - Honestly not much difference...maybe even a bit slower.
 
 
-
+15. Removed Cluster class entirely and use vectors to store relevant info
+TOTAL EXECUTION TIME = 41179μs
+TIME PHASE 1 = 1μs
+TIME PHASE 2 = 41178μs
+- Small speedup, probably removed the need for some function call overhead (maybe some more frequent cache hits)
 
 
 
