@@ -308,9 +308,10 @@ public:
 				cout << clusters[i].getCentralValue(j) << " ";
 			cout << "\n\n";
 		}
-        cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
-        cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
-        cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n\n\n" << endl;
+		cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
+		cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
+		cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n" << endl;
+		cout << "AV TIME PER ITERATION = " << (chrono::duration_cast<chrono::microseconds>(end-begin).count() / iter) << "μs\n\n\n" << endl;
 	}
 };
 
@@ -361,6 +362,14 @@ int main(int argc, char *argv[])
 			Point p(i, values, point_name);
 			points.push_back(p);
 		}
+		else
+		{
+			Point p(i, values);
+			points.push_back(p);
+		}
+
+		// Clear any remaining values in the line
+		cin.ignore(numeric_limits<streamsize>::max(), '\n');
 	}
 	KMeans kmeans(K, total_points, total_attr, max_iterations);
 	kmeans.run(points);

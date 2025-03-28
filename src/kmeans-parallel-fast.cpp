@@ -102,8 +102,9 @@ private:
 	int findNearestCluster(Point point)
 	{
 		double sum = 0.0, min_dist;
- 		int id_cluster_center = 0;
- 		for(int i = 0; i < total_attr; i++)
+		int id_cluster_center = 0;
+
+		for(int i = 0; i < total_attr; i++)
 		{
 			double diff = centralValues[i] - point.getValue(i);
 			sum += diff * diff;
@@ -116,14 +117,26 @@ private:
 			sum = 0.0;
 			double* c_vals = &centralValues[getClusterIndex(i, 0)];
 			double* p_vals = point.getValues().data();
- 
+
+			// Process 4 doubles at a time
+			int j;
 			#pragma omp simd
-			for(int j = 0; j < total_attr; j++)
+			for(j = 0; j + 3 < total_attr; j += 4)
+			{
+				double diff0 = c_vals[j] - p_vals[j];
+				double diff1 = c_vals[j+1] - p_vals[j+1];
+				double diff2 = c_vals[j+2] - p_vals[j+2];
+				double diff3 = c_vals[j+3] - p_vals[j+3];
+				sum += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+			}
+
+			// Cleanup loop for remaining elements
+			for(; j < total_attr; j++)
 			{
 				double diff = c_vals[j] - p_vals[j];
 				sum += diff * diff;
 			}
- 
+
 			if (sum < min_dist)
 			{
 				min_dist = sum;
@@ -274,7 +287,8 @@ public:
 		}
 		cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
 		cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
-		cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n\n\n" << endl;
+		cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n" << endl;
+		cout << "AV TIME PER ITERATION = " << (chrono::duration_cast<chrono::microseconds>(end-begin).count() / iter) << "μs\n\n\n" << endl;
 	}
 };
 
@@ -328,6 +342,9 @@ int main(int argc, char *argv[])
 			Point p(i, values);
 			points.push_back(p);
 		}
+
+		// Clear any remaining values in the line
+		cin.ignore(numeric_limits<streamsize>::max(), '\n');
 	}
 
 	vector<Point> backup_points = points; // make a backup copy

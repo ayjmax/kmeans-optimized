@@ -148,7 +148,9 @@ public:
 	void updateCentralValues() {
         if (num_points <= 0) return;
         double inverse_num_points = 1.0 / num_points;
-		for(int i = 0; i < total_attr; i += 8) // 16 attributes
+        int i;
+        // Main unrolled loop - process 8 doubles at a time
+        for(i = 0; i + 7 < total_attr; i += 8)
         {
             central_values[i] = attributeSums[i] * inverse_num_points;
             central_values[i+1] = attributeSums[i+1] * inverse_num_points;
@@ -158,13 +160,20 @@ public:
             central_values[i+5] = attributeSums[i+5] * inverse_num_points;
             central_values[i+6] = attributeSums[i+6] * inverse_num_points;
             central_values[i+7] = attributeSums[i+7] * inverse_num_points;
-		}
+        }
+        // Cleanup loop for remaining elements
+        for(; i < total_attr; i++)
+        {
+            central_values[i] = attributeSums[i] * inverse_num_points;
+        }
 	}
 
 	// 5. Add the attribute values of the point to attributeSums
 	void addAttributeSums(Point point)
 	{
-		for(int i = 0; i < total_attr; i += 8) // 16 attributes
+		int i;
+		// Main unrolled loop - process 8 doubles at a time
+		for(i = 0; i + 7 < total_attr; i += 8)
 		{
 			attributeSums[i] += point.getValue(i);
 			attributeSums[i+1] += point.getValue(i+1);
@@ -174,6 +183,11 @@ public:
 			attributeSums[i+5] += point.getValue(i+5);
 			attributeSums[i+6] += point.getValue(i+6);
 			attributeSums[i+7] += point.getValue(i+7);
+		}
+		// Cleanup loop for remaining elements
+		for(; i < total_attr; i++)
+		{
+			attributeSums[i] += point.getValue(i);
 		}
 	}
 
@@ -210,7 +224,9 @@ private:
 		for(int i = 1; i < K; i++)
 		{
 			sum = 0.0;
-			for(int j = 0; j < total_attr; j += 8) // 16 attributes
+			int j;
+			// Main unrolled loop - process 8 doubles at a time
+			for(j = 0; j + 7 < total_attr; j += 8)
 			{
 				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
 				sum += diff * diff;
@@ -227,6 +243,13 @@ private:
 				diff = clusters[i].getCentralValue(j+6) - point.getValue(j+6);
 				sum += diff * diff;
 				diff = clusters[i].getCentralValue(j+7) - point.getValue(j+7);
+				sum += diff * diff;
+			}
+
+			// Cleanup loop for remaining elements
+			for(; j < total_attr; j++)
+			{
+				double diff = clusters[i].getCentralValue(j) - point.getValue(j);
 				sum += diff * diff;
 			}
 
@@ -331,9 +354,10 @@ public:
 				cout << clusters[i].getCentralValue(j) << " ";
 			cout << "\n\n";
 		}
-        cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
-        cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
-        cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n\n\n" << endl;
+		cout << "TOTAL EXECUTION TIME = "<<chrono::duration_cast<chrono::microseconds>(end-begin).count()<<"μs\n";
+		cout << "TIME PHASE 1 = "<<chrono::duration_cast<chrono::microseconds>(end_phase1-begin).count()<<"μs\n";
+		cout << "TIME PHASE 2 = "<<chrono::duration_cast<chrono::microseconds>(end-end_phase1).count()<<"μs\n" << endl;
+		cout << "AV TIME PER ITERATION = " << (chrono::duration_cast<chrono::microseconds>(end-begin).count() / iter) << "μs\n\n\n" << endl;
 	}
 };
 
@@ -384,6 +408,14 @@ int main(int argc, char *argv[])
 			Point p(i, values, point_name);
 			points.push_back(p);
 		}
+		else
+		{
+			Point p(i, values);
+			points.push_back(p);
+		}
+
+		// Clear any remaining values in the line
+		cin.ignore(numeric_limits<streamsize>::max(), '\n');
 	}
 	KMeans kmeans(K, total_points, total_attr, max_iterations);
 	kmeans.run(points);
